@@ -1,139 +1,89 @@
-#include <ESP8266WiFi.h>
-#include <ESP8266mDNS.h>
+#include <ESP8266WiFi.h> //ESP8266 Core WiFi Library (you most likely already have this in your sketch)
+#include <ESP8266mDNS.h> // Simple ESP8266 Multicast DNS for .local urls
+#include <DNSServer.h> //Local DNS Server used for redirecting all requests to the configuration portal
+#include <ESP8266WebServer.h> //Local WebServer used to serve the configuration portal
+#include <WiFiManager.h> //https://github.com/tzapu/WiFiManager WiFi Configuration Magic
 
-//////////////////////
-// WiFi Definitions //
-//////////////////////
-const char WiFiSSID[] = "<PLACE_WIFI_SSID_HERE>";
-const char WiFiPSK[] = "<PLACE_PASSWROD_OR_KEY_HERE";
+
 /////////////////////
 // Pin Definitions //
 /////////////////////
 const int LED_PIN = 5; // Thing's onboard, green LED
-const int ANALOG_PIN = A0; // The only analog pin on the Thing
-const int DIGITAL_PIN = 12; // Digital pin to be read
 const int PUMP_PIN = 13; //Digital pin to keep on for pump;
 
 ///////////////////
 ///app constants///
 ///////////////////
 const int PUMP_ON = 1;
-const int PUMP_OFF = 2;
-const int READ_PINS = -2;
+const int PUMP_OFF = 0;
 
 int state=PUMP_OFF;
 
-
-WiFiServer server(80);
+ESP8266WebServer server(80);
 
 void setup() 
 {
   initHardware();
-  connectWiFi();
+  
+  setupWiFi();
+  //start a local web server and define how it responds to requests  
+  server.on("/", handleRoot); 
+  server.on("/pump", handlePump);
+  server.onNotFound(handleNotFound);
   server.begin();
+  
   setupMDNS();
 }
-
-void loop() 
-{
-  // Check if a client has connected
-  WiFiClient client = server.available();
-  if (!client) {
-    return;
-  }
-
-  Serial.println("Receiving Request");
-  // Read the first line of the request
-  String req = client.readStringUntil('\r');
-  Serial.println(req);
-  client.flush();
-
-  // Match the request
-  int val = -1; // We'll use 'val' to keep track of both the
-                // request type (read/set) and value if set.
-  
-  if (req.indexOf("/pump/on") != -1)
-    val = PUMP_ON; //turn pump on
-  else if (req.indexOf("/pump/off") != -1)
-    val = PUMP_OFF; //turn pump on
-      
-  // Otherwise request will be invalid. We'll say as much in HTML
-
-  // Set GPIO5 according to the request
-  if (val == PUMP_ON) {
-    digitalWrite(LED_PIN, val);
+void handlePump() {
+  if (state == PUMP_ON) {
+    digitalWrite(LED_PIN, HIGH);
     digitalWrite(PUMP_PIN, HIGH);
-    state = val;
   }
-  if (val == PUMP_OFF) {
+  if (state == PUMP_OFF) {
     digitalWrite(PUMP_PIN, LOW);
-    state = val;
+    digitalWrite(LED_PIN, LOW);
+    
   }
-  client.flush();
+  state = !state;
 
-  // Prepare the response. Start with the common header:
-  String s = "HTTP/1.1 200 OK\r\n";
-  s += "Content-Type: text/html\r\n\r\n";
-  s += "<!DOCTYPE HTML>\r\n<html>\r\n";
-  // If we're setting the LED, print out a message saying we did
- 
-    s += "PUMP is now ";
-    if(state == PUMP_ON) {
-      s += "on";
-    }
-    else  {
-      s += "off";
-    }
-      
-  s += "</html>\n";
+  server.sendHeader("Location","/");        // Add a header to respond with a new location for the browser to go to the home page again
+  server.send(303);                         // Send it back to the browser with an HTTP status 303 (See Other) to redirect
+}
+void handleRoot() {
 
-  // Send the response to the client
-  client.print(s);
-  delay(1);
-  Serial.println("Client disonnected");
+
+  char* current_status = "OFF";
+  if(state == PUMP_ON) {
+   current_status = "ON";
+  }
+  char temp[400];
   
-  // The client will actually be disconnected 
-  // when the function returns and 'client' object is detroyed
+  snprintf(temp, 400,
+          "<html>  <head>   <meta http-equiv='refresh' content='5'/>   <title>IOT Pump</title>   <style> \
+     body { background-color: #cccccc; font-family: Arial, Helvetica, Sans-Serif; Color: #000088; }\
+   </style> \
+ </head> \
+ <body> \
+   <h1>Welcome to the IOT Pump</h1> \
+   <h2>Pump is currently %s </h2> \
+   <form action=\"/pump\" method=\"POST\"><input type=\"submit\" value=\"Toggle Pump\"></form>\
+ </body>\
+</html>",
+  current_status
+         );
+
+  server.send(200, "text/html", temp);   // Send HTTP status 200 (Ok) and send some html to the browser/client
 }
 
-void connectWiFi()
-{
-  byte ledStatus = LOW;
-  Serial.println();
-  Serial.println("Connecting to: " + String(WiFiSSID));
-  // Set WiFi mode to station (as opposed to AP or AP_STA)
-  WiFi.mode(WIFI_STA);
-
-  // WiFI.begin([ssid], [passkey]) initiates a WiFI connection
-  // to the stated [ssid], using the [passkey] as a WPA, WPA2,
-  // or WEP passphrase.
-  WiFi.begin(WiFiSSID, WiFiPSK);
-
-  // Use the WiFi.status() function to check if the ESP8266
-  // is connected to a WiFi network.
-  while (WiFi.status() != WL_CONNECTED)
-  {
-    // Blink the LED
-    digitalWrite(LED_PIN, ledStatus); // Write LED high/low
-    ledStatus = (ledStatus == HIGH) ? LOW : HIGH;
-
-    // Delays allow the ESP8266 to perform critical tasks
-    // defined outside of the sketch. These tasks include
-    // setting up, and maintaining, a WiFi connection.
-    delay(100);
-    // Potentially infinite loops are generally dangerous.
-    // Add delays -- allowing the processor to perform other
-    // tasks -- wherever possible.
-  }
-  Serial.println("WiFi connected");  
-  Serial.println("IP address: ");
-  Serial.println(WiFi.localIP());
+void handleNotFound(){
+  server.send(404, "text/plain", "404: Not found"); // Send HTTP status 404 (Not Found) when there's no handler for the URI in the request
 }
+
 
 void setupMDNS()
 {
   // Call MDNS.begin(<domain>) to set up mDNS to point to
-  // "<domain>.local"
+
   if (!MDNS.begin("pump")) 
   {
     Serial.println("Error setting up MDNS responder!");
@@ -145,15 +95,40 @@ void setupMDNS()
 
 }
 
+void setupWiFi()
+{
+  WiFi.mode(WIFI_AP);
+
+  // Do a little work to get a unique-ish name. Append the
+  // last two bytes of the MAC (HEX'd) to "Thing-":
+  uint8_t mac[WL_MAC_ADDR_LENGTH];
+  WiFi.softAPmacAddress(mac);
+  String macID = String(mac[WL_MAC_ADDR_LENGTH - 2], HEX) +
+                 String(mac[WL_MAC_ADDR_LENGTH - 1], HEX);
+  macID.toUpperCase();
+
+  //Use the WiFIManager to prompt for SSID and creds
+  WiFiManager wifiManager;
+  String AP_NAME = "Pump Thing "+macID;
+  char* buf;
+  AP_NAME.toCharArray(buf, AP_NAME.length());
+//first parameter is name of access point, second is the password (if present)
+  wifiManager.autoConnect(buf);
+}
+
 void initHardware()
 {
   Serial.begin(9600);
-  pinMode(DIGITAL_PIN, INPUT_PULLUP);
   pinMode(LED_PIN, OUTPUT);
   
   digitalWrite(LED_PIN, HIGH);
   pinMode(PUMP_PIN, OUTPUT);
   digitalWrite(PUMP_PIN, LOW);
-  // Don't need to set ANALOG_PIN as input, 
-  // that's all it can be.
 }
+
+void loop() 
+{
+  server.handleClient(); 
+
+}
+
