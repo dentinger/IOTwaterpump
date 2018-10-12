@@ -8,7 +8,8 @@ The ESP8266 will register itself on a wireless network and then the pump can be 
 http://pump.local/ by any device also on the same network.
 
 ## Network Configuration  
-Currently to use this someone will have to supply their own SSID and key then upload the code onto their Arduino.
+The [WiFiManager](https://github.com/tzapu/WiFiManager) library handles the network setup.  When first uploaded to the Arduino, the Arduino will create it's
+own access point that is named uniquely as: Pump Thing (+ last 2 HEX digits of mac address). To configure your WiFi details, switch your wireless connection the above access point and then provide your access point credentials.  These will be store in durable memory.  
 
 ## WebServer Configuration
 Using the ESP8266WebServer library, the web server is very easily configured using callback functions.  
