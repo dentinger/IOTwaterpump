@@ -32,7 +32,7 @@ This uses the following Arduino Libraries.
 * ESP8266mDNS - Simple ESP8266 Multicast DNS for .local urls
 * ESP8266WebServer - Local WebServer used to serve the configuration portal
 * [WiFiManager](https://github.com/tzapu/WiFiManager) - WiFi Configuration Magic
-* Local DNS Server used for redirecting all requests to the configuration portal
+* DNSServer - Local DNS Server used for redirecting all requests to the configuration portal
 
 ## Hardware BOM
 The POC of this was built with the following BOM
