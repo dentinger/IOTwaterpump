@@ -14,8 +14,8 @@ const int PUMP_PIN = 13; //Digital pin to keep on for pump;
 ///////////////////
 ///app constants///
 ///////////////////
-const int PUMP_ON = 1;
-const int PUMP_OFF = 0;
+const int PUMP_ON = 0;
+const int PUMP_OFF = 1;
 
 int state=PUMP_OFF;
 
@@ -36,11 +36,13 @@ void setup()
 }
 void handlePump() {
   if (state == PUMP_ON) {
+     Serial.println("State is PUMP ON, turning off");
     digitalWrite(LED_PIN, HIGH);
-    digitalWrite(PUMP_PIN, HIGH);
+    digitalWrite(PUMP_PIN, LOW);
   }
   if (state == PUMP_OFF) {
-    digitalWrite(PUMP_PIN, LOW);
+    Serial.println("State is PUMP OFF, turning on");
+    digitalWrite(PUMP_PIN, HIGH);
     digitalWrite(LED_PIN, LOW);
     
   }
@@ -56,6 +58,8 @@ void handleRoot() {
   if(state == PUMP_ON) {
    current_status = "ON";
   }
+  Serial.println("Current state is: ");
+  Serial.println(state);
   char temp[400];
   
   snprintf(temp, 400,
